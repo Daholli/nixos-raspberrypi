@@ -47,7 +47,7 @@
         "armv6l-linux"
       ];
       allSystems = nixpkgs.lib.systems.flakeExposed;
-      forSystems = systems: f: nixpkgs.lib.genAttrs systems (system: f system);
+      forSystems = systems: f: nixpkgs.lib.genAttrs systems f;
       mkRpiPkgs =
         nixpkgs: system:
         import nixpkgs {
@@ -164,26 +164,26 @@
           pkgs = self.legacyPackages.${system};
         in
         {
-          ffmpeg_4 = pkgs.ffmpeg_4;
-          ffmpeg_6 = pkgs.ffmpeg_6;
-          ffmpeg_7 = pkgs.ffmpeg_7;
-          ffmpeg_7-headless = pkgs.ffmpeg_7-headless;
-          ffmpeg_8 = pkgs.ffmpeg_8;
-          ffmpeg_8-headless = pkgs.ffmpeg_8-headless;
+          inherit (pkgs) ffmpeg_4;
+          inherit (pkgs) ffmpeg_6;
+          inherit (pkgs) ffmpeg_7;
+          inherit (pkgs) ffmpeg_7-headless;
+          inherit (pkgs) ffmpeg_8;
+          inherit (pkgs) ffmpeg_8-headless;
 
-          kodi = pkgs.kodi;
-          kodi-gbm = pkgs.kodi-gbm;
-          kodi-wayland = pkgs.kodi-wayland;
+          inherit (pkgs) kodi;
+          inherit (pkgs) kodi-gbm;
+          inherit (pkgs) kodi-wayland;
 
-          libcamera = pkgs.libcamera;
-          libpisp = pkgs.libpisp;
-          libraspberrypi = pkgs.libraspberrypi;
+          inherit (pkgs) libcamera;
+          inherit (pkgs) libpisp;
+          inherit (pkgs) libraspberrypi;
 
-          raspberrypi-utils = pkgs.raspberrypi-utils;
-          raspberrypi-udev-rules = (pkgs.callPackage ./pkgs/raspberrypi/udev-rules.nix { });
-          rpicam-apps = pkgs.rpicam-apps;
+          inherit (pkgs) raspberrypi-utils;
+          raspberrypi-udev-rules = pkgs.callPackage ./pkgs/raspberrypi/udev-rules.nix { };
+          inherit (pkgs) rpicam-apps;
 
-          vlc = pkgs.vlc;
+          inherit (pkgs) vlc;
 
           # see legacyPackages.<system>.linuxAndFirmware for other versions of
           # the bundle
@@ -259,28 +259,62 @@
               ++ modules;
             };
 
-          custom-user-config = (
+          custom-user-config =
             {
               config,
               pkgs,
               lib,
-              nixos-raspberrypi,
               ...
             }:
             {
+              users.users.remotebuild = {
+                isNormalUser = true;
+                createHome = false;
+                group = "remotebuild";
+
+                openssh.authorizedKeys.keys = [
+                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJYZjG+XPNoVHVdCel5MK4mwvtoFCqDY1WMI1yoU71Rd root@yggdrasil"
+                ];
+              };
+
+              users.groups.remotebuild = { };
+
+              nix = {
+                nrBuildUsers = 64;
+                settings = {
+                  trusted-users = [ "remotebuild" ];
+
+                  min-free = 10 * 1024 * 1024;
+                  max-free = 200 * 1024 * 1024;
+
+                  max-jobs = "auto";
+                  cores = 0;
+                };
+              };
+
+              systemd.services.nix-daemon.serviceConfig = {
+                MemoryAccounting = true;
+                MemoryMax = "90%";
+                OOMScoreAdjust = 500;
+                Slice = "-.slice";
+              };
 
               users.users.nixos.openssh.authorizedKeys.keys = [
                 # YOUR SSH PUB KEY HERE #
+                "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHFrDiO5+vMfD5MimkzN32iw3MnSMLZ0mHvOrHVVmLD0"
 
               ];
               users.users.root.openssh.authorizedKeys.keys = [
                 # YOUR SSH PUB KEY HERE #
+                "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHFrDiO5+vMfD5MimkzN32iw3MnSMLZ0mHvOrHVVmLD0"
 
               ];
 
               environment.systemPackages = with pkgs; [
                 tree
               ];
+
+              networking.wireless.enable = lib.mkForce false;
 
               system.nixos.tags =
                 let
@@ -291,8 +325,7 @@
                   cfg.bootloader
                   config.boot.kernelPackages.kernel.version
                 ];
-            }
-          );
+            };
 
         in
         {
@@ -300,9 +333,6 @@
           rpi02-installer = mkNixOSRPiInstaller [
             (
               {
-                config,
-                pkgs,
-                lib,
                 nixos-raspberrypi,
                 ...
               }:
@@ -320,9 +350,6 @@
           rpi3-installer = mkNixOSRPiInstaller [
             (
               {
-                config,
-                pkgs,
-                lib,
                 nixos-raspberrypi,
                 ...
               }:
@@ -339,9 +366,6 @@
           rpi4-installer = mkNixOSRPiInstaller [
             (
               {
-                config,
-                pkgs,
-                lib,
                 nixos-raspberrypi,
                 ...
               }:
@@ -358,9 +382,6 @@
           rpi5-installer = mkNixOSRPiInstaller [
             (
               {
-                config,
-                pkgs,
-                lib,
                 nixos-raspberrypi,
                 ...
               }:

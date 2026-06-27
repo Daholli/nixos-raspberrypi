@@ -224,7 +224,6 @@
 
       nixosConfigurations =
         let
-
           # TIP: To create "regular" nixosConfigurations look for
           # `nixosSystem` and `nixosSystemFull` helpers in `lib/`
           mkNixOSRPiInstaller =
@@ -259,28 +258,62 @@
               ++ modules;
             };
 
-          custom-user-config = (
+          custom-user-config =
             {
               config,
               pkgs,
               lib,
-              nixos-raspberrypi,
               ...
             }:
             {
+              users.users.remotebuild = {
+                isNormalUser = true;
+                createHome = false;
+                group = "remotebuild";
+
+                openssh.authorizedKeys.keys = [
+                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJYZjG+XPNoVHVdCel5MK4mwvtoFCqDY1WMI1yoU71Rd root@yggdrasil"
+                ];
+              };
+
+              users.groups.remotebuild = { };
+
+              nix = {
+                nrBuildUsers = 64;
+                settings = {
+                  trusted-users = [ "remotebuild" ];
+
+                  min-free = 10 * 1024 * 1024;
+                  max-free = 200 * 1024 * 1024;
+
+                  max-jobs = "auto";
+                  cores = 0;
+                };
+              };
+
+              systemd.services.nix-daemon.serviceConfig = {
+                MemoryAccounting = true;
+                MemoryMax = "90%";
+                OOMScoreAdjust = 500;
+                Slice = "-.slice";
+              };
 
               users.users.nixos.openssh.authorizedKeys.keys = [
                 # YOUR SSH PUB KEY HERE #
+                "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHFrDiO5+vMfD5MimkzN32iw3MnSMLZ0mHvOrHVVmLD0"
 
               ];
               users.users.root.openssh.authorizedKeys.keys = [
                 # YOUR SSH PUB KEY HERE #
+                "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHFrDiO5+vMfD5MimkzN32iw3MnSMLZ0mHvOrHVVmLD0"
 
               ];
 
               environment.systemPackages = with pkgs; [
                 tree
               ];
+
+              networking.wireless.enable = lib.mkForce false;
 
               system.nixos.tags =
                 let
@@ -291,8 +324,7 @@
                   cfg.bootloader
                   config.boot.kernelPackages.kernel.version
                 ];
-            }
-          );
+            };
 
         in
         {
